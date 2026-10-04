@@ -1,21 +1,36 @@
 """
 Django settings for the Videoflix backend.
 
-This module contains the central configuration for installed applications,
-middleware, authentication, database access, email, CORS and media files.
+This module contains the central configuration for applications,
+middleware, authentication, PostgreSQL, Redis, email, CORS and media.
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = "django-insecure-lo!6n==3b^1=-jzr63e=cd_d=p3^saqx-1gl&p-_@p0*h@4^7)"
 
-DEBUG = True
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "unsafe-development-key",
+)
 
-ALLOWED_HOSTS = []
+DEBUG = os.getenv(
+    "DEBUG",
+    "False",
+).lower() == "true"
+
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "web",
+]
 
 
 INSTALLED_APPS = [
@@ -72,8 +87,27 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv(
+            "POSTGRES_DB",
+            "videoflix",
+        ),
+        "USER": os.getenv(
+            "POSTGRES_USER",
+            "videoflix",
+        ),
+        "PASSWORD": os.getenv(
+            "POSTGRES_PASSWORD",
+            "videoflix",
+        ),
+        "HOST": os.getenv(
+            "POSTGRES_HOST",
+            "db",
+        ),
+        "PORT": os.getenv(
+            "POSTGRES_PORT",
+            "5432",
+        ),
     }
 }
 
@@ -137,7 +171,10 @@ MAILERS = {
 DEFAULT_FROM_EMAIL = "noreply@videoflix.local"
 
 
-FRONTEND_URL = "http://127.0.0.1:5500"
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://127.0.0.1:5500",
+)
 
 
 CORS_ALLOWED_ORIGINS = [
@@ -149,15 +186,36 @@ CORS_ALLOW_CREDENTIALS = True
 
 
 MEDIA_URL = "/media/"
+
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-# Redis queue used for background video conversion.
+REDIS_HOST = os.getenv(
+    "REDIS_HOST",
+    "redis",
+)
+
+REDIS_PORT = int(
+    os.getenv(
+        "REDIS_PORT",
+        "6379",
+    )
+)
+
+
 RQ_QUEUES = {
     "default": {
-        "HOST": "localhost",
-        "PORT": 6379,
+        "HOST": REDIS_HOST,
+        "PORT": REDIS_PORT,
         "DB": 0,
         "DEFAULT_TIMEOUT": 3600,
+    }
+}
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
     }
 }
