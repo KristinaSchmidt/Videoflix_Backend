@@ -31,12 +31,22 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+
+    # Third-party applications
+    "corsheaders",
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "django_rq",
+
+    # Local applications
+    "users",
+    "videos",
 ]
 
 MIDDLEWARE = [
@@ -125,3 +135,38 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+
+# Custom user model
+AUTH_USER_MODEL = "users.User"
+
+
+# Django REST Framework configuration
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+}
+
+
+# Email configuration for local development.
+# Emails are printed to the console instead of being sent.
+MAILERS = {
+    "default": {
+        "BACKEND": "django.core.mail.backends.console.EmailBackend",
+    }
+}
+
+DEFAULT_FROM_EMAIL = "noreply@videoflix.local"
+
+
+# Frontend address used for links inside emails.
+FRONTEND_URL = "http://127.0.0.1:5500"
+
+
+# Allow the local Videoflix frontend to access the API.
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+]
