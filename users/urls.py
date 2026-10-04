@@ -1,8 +1,16 @@
-"""URL configuration for user registration and account activation."""
+"""URL configuration for Videoflix authentication."""
 
 from django.urls import path
 
-from .views import ActivateAccountView, RegisterView
+from .views import (
+    ActivateAccountView,
+    LoginView,
+    LogoutView,
+    PasswordConfirmView,
+    PasswordResetView,
+    RegisterView,
+    TokenRefreshView,
+)
 
 
 urlpatterns = [
@@ -11,5 +19,18 @@ urlpatterns = [
         "activate/<uidb64>/<token>/",
         ActivateAccountView.as_view(),
         name="activate",
+    ),
+    path("login/", LoginView.as_view(), name="login"),
+    path("logout/", LogoutView.as_view(), name="logout"),
+    path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path(
+        "password_reset/",
+        PasswordResetView.as_view(),
+        name="password-reset",
+    ),
+    path(
+        "password_confirm/<uidb64>/<token>/",
+        PasswordConfirmView.as_view(),
+        name="password-confirm",
     ),
 ]

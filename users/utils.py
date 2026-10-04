@@ -21,3 +21,21 @@ def send_activation_email(user):
         settings.DEFAULT_FROM_EMAIL,
         [user.email],
     )
+
+
+def send_password_reset_email(user):
+    """Create a password reset token and send the reset link by email."""
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+
+    reset_url = (
+        f"{settings.FRONTEND_URL}/pages/auth/confirm_password.html"
+        f"?uid={uid}&token={token}"
+    )
+
+    send_mail(
+        "Reset your Videoflix password",
+        f"Reset your password: {reset_url}",
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+    )

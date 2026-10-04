@@ -34,3 +34,31 @@ class RegistrationSerializer(serializers.ModelSerializer):
             is_active=False,
             **validated_data,
         )
+
+
+class LoginSerializer(serializers.Serializer):
+    """Validate the credentials used for user login."""
+
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    """Validate the email address used for a password reset request."""
+
+    email = serializers.EmailField()
+
+
+class PasswordConfirmSerializer(serializers.Serializer):
+    """Validate and confirm a new user password."""
+
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        """Ensure that both submitted passwords are identical."""
+        if data["new_password"] != data["confirm_password"]:
+            raise serializers.ValidationError(
+                {"password": "Passwords do not match."}
+            )
+        return data
