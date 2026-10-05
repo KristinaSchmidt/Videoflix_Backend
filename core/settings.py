@@ -88,26 +88,11 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv(
-            "POSTGRES_DB",
-            "videoflix",
-        ),
-        "USER": os.getenv(
-            "POSTGRES_USER",
-            "videoflix",
-        ),
-        "PASSWORD": os.getenv(
-            "POSTGRES_PASSWORD",
-            "videoflix",
-        ),
-        "HOST": os.getenv(
-            "POSTGRES_HOST",
-            "db",
-        ),
-        "PORT": os.getenv(
-            "POSTGRES_PORT",
-            "5432",
-        ),
+        "NAME": os.getenv("POSTGRES_DB", "videoflix"),
+        "USER": os.getenv("POSTGRES_USER", "videoflix"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "videoflix"),
+        "HOST": os.getenv("POSTGRES_HOST", "db"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
 }
 
@@ -141,11 +126,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
 
@@ -164,11 +146,27 @@ REST_FRAMEWORK = {
 
 MAILERS = {
     "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
+        "BACKEND": os.getenv(
+            "EMAIL_BACKEND",
+            "django.core.mail.backends.smtp.EmailBackend",
+        ),
+        "OPTIONS": {
+            "host": os.getenv("EMAIL_HOST", "localhost"),
+            "port": int(os.getenv("EMAIL_PORT", "587")),
+            "username": os.getenv("EMAIL_HOST_USER", ""),
+            "password": os.getenv("EMAIL_HOST_PASSWORD", ""),
+            "use_tls": os.getenv(
+                "EMAIL_USE_TLS",
+                "True",
+            ).lower() == "true",
+        },
     }
 }
 
-DEFAULT_FROM_EMAIL = "noreply@videoflix.local"
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    "noreply@videoflix.local",
+)
 
 
 FRONTEND_URL = os.getenv(
@@ -186,21 +184,11 @@ CORS_ALLOW_CREDENTIALS = True
 
 
 MEDIA_URL = "/media/"
-
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-REDIS_HOST = os.getenv(
-    "REDIS_HOST",
-    "redis",
-)
-
-REDIS_PORT = int(
-    os.getenv(
-        "REDIS_PORT",
-        "6379",
-    )
-)
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
 
 RQ_QUEUES = {
