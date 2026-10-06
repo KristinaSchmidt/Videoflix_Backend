@@ -9,7 +9,7 @@ asynchronous video processing.
 
 ## Technologies
 
-- Python 3.13
+- Python
 - Django
 - Django REST Framework
 - PostgreSQL
@@ -17,6 +17,7 @@ asynchronous video processing.
 - Django RQ
 - Simple JWT
 - FFmpeg
+- Gunicorn
 - Docker
 - Docker Compose
 
@@ -41,100 +42,93 @@ cd Videoflix_Backend
 
 ### 2. Create the environment file
 
-The repository contains an `.env.example` file with all required
+The repository contains an `.env.template` file with the required
 environment variables.
 
-Create your local `.env` file from it.
+Create your local `.env` file from the template.
 
 Git Bash / Linux / macOS:
 
 ```bash
-cp .env.example .env
+cp .env.template .env
 ```
 
 Windows PowerShell:
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item .env.template .env
 ```
 
-The `.env` file contains sensitive configuration and is therefore
-excluded from Git.
+The `.env` file contains local configuration and sensitive values and
+must not be committed to Git.
 
-### 3. Configure the environment variables
+Do not remove required environment variables from the template.
 
-The database and Redis host names must remain `db` and `redis` when
-using Docker Compose because these are the service names inside the
-Docker network.
+### 3. Environment configuration
 
-Example:
+The Docker setup uses the service names `db` and `redis` internally.
+Therefore `DB_HOST` and `REDIS_HOST` should keep these values when the
+project is started with Docker Compose.
+
+The environment file also contains the credentials used for the
+automatically created Django administrator:
 
 ```env
-SECRET_KEY=change-me
-DEBUG=True
+DJANGO_SUPERUSER_USERNAME=admin
+DJANGO_SUPERUSER_PASSWORD=adminpassword
+DJANGO_SUPERUSER_EMAIL=admin@example.com
+```
 
-POSTGRES_DB=videoflix
-POSTGRES_USER=videoflix
-POSTGRES_PASSWORD=videoflix
-POSTGRES_HOST=db
-POSTGRES_PORT=5432
+The Videoflix user model authenticates users by email address. Therefore
+the automatically created administrator can log in with the configured
+email address and password.
 
+The database configuration uses the following variables:
+
+```env
+DB_NAME=videoflix
+DB_USER=videoflix
+DB_PASSWORD=videoflix
+DB_HOST=db
+DB_PORT=5432
+```
+
+Redis is configured through:
+
+```env
 REDIS_HOST=redis
+REDIS_LOCATION=redis://redis:6379/1
 REDIS_PORT=6379
-
-FRONTEND_URL=http://127.0.0.1:5500
+REDIS_DB=0
 ```
 
 ## Email Configuration
 
 Videoflix sends emails for account activation and password reset.
 
-For real email delivery, configure an SMTP server in `.env`:
+Configure the SMTP settings in `.env`:
 
 ```env
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=smtp.example.com
 EMAIL_PORT=587
-EMAIL_HOST_USER=your-email@example.com
-EMAIL_HOST_PASSWORD=your-email-password
+EMAIL_HOST_USER=your_email_user
+EMAIL_HOST_PASSWORD=your_email_user_password
 EMAIL_USE_TLS=True
-DEFAULT_FROM_EMAIL=your-email@example.com
-```
-
-Replace the example SMTP values with the credentials supplied by your
-email provider.
-
-`DEFAULT_FROM_EMAIL` defines the sender address used for activation and
-password reset emails.
-
-For local development without a real SMTP account, the console email
-backend can be used:
-
-```env
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-EMAIL_HOST=localhost
-EMAIL_PORT=587
-EMAIL_HOST_USER=
-EMAIL_HOST_PASSWORD=
-EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
 DEFAULT_FROM_EMAIL=noreply@videoflix.local
 ```
 
-With the console backend, emails are not delivered to a mailbox.
-Instead, their content and the activation or password-reset link are
-printed in the backend container logs.
+Replace the example SMTP values with the credentials of the SMTP server
+used for the project.
 
-The logs can be displayed with:
-
-```bash
-docker compose logs -f web
-```
+`DEFAULT_FROM_EMAIL` defines the sender address used for activation and
+password reset emails.
 
 ## Start the Project
 
 Make sure Docker Desktop is running.
 
-Build the images and start all services:
+Build the backend image and start the services:
 
 ```bash
 docker compose up --build -d
@@ -144,19 +138,46 @@ Docker Compose starts:
 
 - PostgreSQL
 - Redis
-- Django web server
-- Django RQ worker
+- Videoflix backend
 
-The database and Redis services have health checks. The web application
-and worker wait until the required services are available.
+The project uses the provided Docker setup with `backend.Dockerfile`,
+`backend.entrypoint.sh` and `docker-compose.yml`.
 
-The `backend.entrypoint.sh` script additionally waits for PostgreSQL and
-runs the Django database migrations automatically before the application
-starts.
+The backend entrypoint waits until PostgreSQL is available and then
+automatically:
 
-The backend is then available at:
+1. collects static files
+2. creates migrations if necessary
+3. applies database migrations
+4. creates the configured Django superuser if it does not exist
+5. starts the Django RQ worker
+6. starts Gunicorn
+
+The RQ worker runs from the backend entrypoint and does not require a
+separate Docker Compose service.
+
+The backend is available at:
 
 `http://127.0.0.1:8000/`
+
+## Django Admin
+
+The Django administrator is created automatically when the backend
+container starts for the first time.
+
+With the default values from `.env.template`:
+
+```text
+Email: admin@example.com
+Password: adminpassword
+```
+
+The Django administration interface is available at:
+
+`http://127.0.0.1:8000/admin/`
+
+For a real deployment, replace the default administrator credentials
+with secure values.
 
 ## Check Running Containers
 
@@ -164,8 +185,7 @@ The backend is then available at:
 docker compose ps
 ```
 
-The database and Redis containers should be shown as healthy and the
-web and rqworker containers should be running.
+The PostgreSQL, Redis and backend containers should be running.
 
 ## Django System Check
 
@@ -181,8 +201,8 @@ System check identified no issues (0 silenced).
 
 ## Database Migrations
 
-Migrations are automatically executed by the backend entrypoint when
-the containers start.
+Migrations are automatically handled by the backend entrypoint when the
+container starts.
 
 They can also be executed manually:
 
@@ -190,25 +210,15 @@ They can also be executed manually:
 docker compose exec web python manage.py migrate
 ```
 
-After changing models, create migrations with:
+After changing models, migrations can be created with:
 
 ```bash
 docker compose exec web python manage.py makemigrations
 ```
 
-## Create an Admin User
-
-```bash
-docker compose exec web python manage.py createsuperuser
-```
-
-The Django administration interface is available at:
-
-`http://127.0.0.1:8000/admin/`
-
 ## Run Tests
 
-Run the complete test suite inside the Docker container:
+Run the complete test suite inside the backend container:
 
 ```bash
 docker compose exec web python manage.py test
@@ -216,12 +226,14 @@ docker compose exec web python manage.py test
 
 ## Stop the Project
 
+Stop the containers with:
+
 ```bash
 docker compose down
 ```
 
-To remove the containers and Docker volumes including the local
-PostgreSQL data:
+To additionally remove the local Docker volumes and local PostgreSQL
+data:
 
 ```bash
 docker compose down -v
@@ -295,11 +307,11 @@ Videoflix_Backend/
 ├── core/
 ├── users/
 ├── videos/
+├── backend.Dockerfile
 ├── backend.entrypoint.sh
-├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
-├── .env.example
+├── .env.template
 └── manage.py
 ```
 
@@ -311,5 +323,6 @@ JWT authentication tokens are stored in HTTP-only cookies.
 
 Password-reset responses do not reveal whether an email address exists.
 
-Secrets and SMTP credentials belong in the local `.env` file. The
-`.env` file is excluded from Git and must not be committed.
+Secrets, SMTP credentials and production passwords belong in the local
+`.env` file. The `.env` file is excluded from Git and must not be
+committed.

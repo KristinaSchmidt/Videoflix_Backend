@@ -1,8 +1,8 @@
 """
 Django settings for the Videoflix backend.
 
-This module contains the central configuration for applications,
-middleware, authentication, PostgreSQL, Redis, email, CORS and media.
+Central configuration for Django, PostgreSQL, Redis, authentication,
+email, CORS, static files and media files.
 """
 
 import os
@@ -26,11 +26,15 @@ DEBUG = os.getenv(
     "False",
 ).lower() == "true"
 
-ALLOWED_HOSTS = [
+ALLOWED_HOSTS = os.environ.get(
+    "ALLOWED_HOSTS",
     "localhost",
-    "127.0.0.1",
-    "web",
-]
+).split(",")
+
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://localhost:5500",
+).split(",")
 
 
 INSTALLED_APPS = [
@@ -53,6 +57,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -88,11 +93,26 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "videoflix"),
-        "USER": os.getenv("POSTGRES_USER", "videoflix"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "videoflix"),
-        "HOST": os.getenv("POSTGRES_HOST", "db"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "NAME": os.environ.get(
+            "DB_NAME",
+            "videoflix_db",
+        ),
+        "USER": os.environ.get(
+            "DB_USER",
+            "videoflix_user",
+        ),
+        "PASSWORD": os.environ.get(
+            "DB_PASSWORD",
+            "supersecretpassword",
+        ),
+        "HOST": os.environ.get(
+            "DB_HOST",
+            "db",
+        ),
+        "PORT": os.environ.get(
+            "DB_PORT",
+            "5432",
+        ),
     }
 }
 
@@ -131,7 +151,15 @@ USE_I18N = True
 USE_TZ = True
 
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+STATICFILES_STORAGE = (
+    "whitenoise.storage.CompressedManifestStaticFilesStorage"
+)
 
 
 AUTH_USER_MODEL = "users.User"
@@ -146,26 +174,45 @@ REST_FRAMEWORK = {
 
 MAILERS = {
     "default": {
-        "BACKEND": os.getenv(
-            "EMAIL_BACKEND",
-            "django.core.mail.backends.smtp.EmailBackend",
-        ),
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
         "OPTIONS": {
-            "host": os.getenv("EMAIL_HOST", "localhost"),
-            "port": int(os.getenv("EMAIL_PORT", "587")),
-            "username": os.getenv("EMAIL_HOST_USER", ""),
-            "password": os.getenv("EMAIL_HOST_PASSWORD", ""),
+            "host": os.getenv(
+                "EMAIL_HOST",
+                "smtp.example.com",
+            ),
+            "port": int(
+                os.getenv(
+                    "EMAIL_PORT",
+                    "587",
+                )
+            ),
+            "username": os.getenv(
+                "EMAIL_HOST_USER",
+                "",
+            ),
+            "password": os.getenv(
+                "EMAIL_HOST_PASSWORD",
+                "",
+            ),
             "use_tls": os.getenv(
                 "EMAIL_USE_TLS",
                 "True",
+            ).lower() == "true",
+            "use_ssl": os.getenv(
+                "EMAIL_USE_SSL",
+                "False",
             ).lower() == "true",
         },
     }
 }
 
+
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
-    "noreply@videoflix.local",
+    os.getenv(
+        "EMAIL_HOST_USER",
+        "noreply@videoflix.local",
+    ),
 )
 
 
@@ -183,27 +230,47 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+REDIS_HOST = os.environ.get(
+    "REDIS_HOST",
+    "redis",
+)
+
+REDIS_PORT = int(
+    os.environ.get(
+        "REDIS_PORT",
+        "6379",
+    )
+)
+
+REDIS_DB = int(
+    os.environ.get(
+        "REDIS_DB",
+        "0",
+    )
+)
 
 
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get(
+            "REDIS_LOCATION",
+            "redis://redis:6379/1",
+        ),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "videoflix",
+    }
+}
 
 
 RQ_QUEUES = {
     "default": {
         "HOST": REDIS_HOST,
         "PORT": REDIS_PORT,
-        "DB": 0,
-        "DEFAULT_TIMEOUT": 3600,
-    }
-}
-
-
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
-    }
+        "DB": REDIS_DB,
+        "DEFAULT_TIMEOUT": 900,
+        "REDIS_CLIENT_KWARGS": {},
+    },
 }
