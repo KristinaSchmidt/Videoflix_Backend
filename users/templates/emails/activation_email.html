@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm your email</title>
+</head>
+
+<body style="margin:0; padding:0; background:#ffffff; font-family:Arial, Helvetica, sans-serif; color:#535456;">
+
+<table role="presentation"
+       width="100%"
+       cellspacing="0"
+       cellpadding="0"
+       border="0">
+
+    <tr>
+        <td align="center" style="padding:40px 30px;">
+
+            <table role="presentation"
+                   width="100%"
+                   cellspacing="0"
+                   cellpadding="0"
+                   border="0"
+                   style="max-width:760px;">
+
+                <tr>
+                    <td align="center" style="padding-bottom:28px;">
+                        <div style="
+                            font-size:38px;
+                            font-weight:700;
+                            letter-spacing:-2px;
+                            color:#5b21ff;
+                        ">
+                            ▶ VIDEOFLIX
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        font-size:16px;
+                        line-height:1.6;
+                        color:#535456;
+                    ">
+
+                        <p style="margin:0 0 8px 0;">
+                            Dear
+                            <span style="color:#3547ff;">
+                                {{ user_email }}
+                            </span>,
+                        </p>
+
+                        <p style="margin:0 0 22px 0;">
+                            Thank you for registering with
+                            <span style="color:#3547ff;">Videoflix</span>.
+                            To complete your registration and verify your
+                            email address, please click the link below:
+                        </p>
+
+                        <p style="margin:0 0 24px 0;">
+                            <a href="{{ activation_url }}"
+                               style="
+                                   display:inline-block;
+                                   background:#3547ff;
+                                   color:#ffffff;
+                                   text-decoration:none;
+                                   font-weight:700;
+                                   padding:13px 22px;
+                                   border-radius:24px;
+                               ">
+                                Activate account
+                            </a>
+                        </p>
+
+                        <p style="margin:0 0 20px 0;">
+                            If you did not create an account with us,
+                            please disregard this email.
+                        </p>
+
+                        <p style="margin:0 0 20px 0;">
+                            Best regards,
+                        </p>
+
+                        <p style="margin:0;">
+                            Your Videoflix Team.
+                        </p>
+
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+
+</table>
+
+</body>
+</html>
