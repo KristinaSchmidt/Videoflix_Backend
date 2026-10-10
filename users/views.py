@@ -1,3 +1,4 @@
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
@@ -37,8 +38,9 @@ def set_auth_cookies(response, refresh):
 
 
 class RegisterView(APIView):
-    """Handle the registration of new Videoflix users."""
+    """Register new users without requiring an existing JWT."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -67,6 +69,7 @@ class RegisterView(APIView):
 class ActivateAccountView(APIView):
     """Activate an account using its UID and activation token."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
@@ -103,6 +106,7 @@ class ActivateAccountView(APIView):
 class LoginView(APIView):
     """Authenticate users and create JWT authentication cookies."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -143,6 +147,7 @@ class LoginView(APIView):
 class LogoutView(APIView):
     """Log out a user and remove authentication cookies."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -169,6 +174,7 @@ class LogoutView(APIView):
 class TokenRefreshView(APIView):
     """Create a new access token from the refresh cookie."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -209,6 +215,7 @@ class TokenRefreshView(APIView):
 class PasswordResetView(APIView):
     """Start the password reset process."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -240,6 +247,7 @@ class PasswordResetView(APIView):
 class PasswordConfirmView(APIView):
     """Set a new password using a valid UID and reset token."""
 
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request, uidb64, token):
