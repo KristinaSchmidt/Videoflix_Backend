@@ -1,3 +1,4 @@
+
 """Views for video metadata and HLS streaming."""
 
 from pathlib import Path
@@ -28,6 +29,29 @@ class VideoListView(ListAPIView):
     def get_queryset(self):
         """Return all videos ordered by creation date."""
         return Video.objects.all()
+
+
+class VideoThumbnailView(APIView):
+    """Serve an uploaded thumbnail to authenticated users."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, video_id):
+        """Return the thumbnail belonging to a video."""
+        try:
+            video = Video.objects.get(pk=video_id)
+        except Video.DoesNotExist:
+            raise Http404
+
+        if not video.thumbnail:
+            raise Http404
+
+        try:
+            thumbnail_file = video.thumbnail.open("rb")
+        except (FileNotFoundError, OSError, ValueError):
+            raise Http404
+
+        return FileResponse(thumbnail_file)
 
 
 class HLSPlaylistView(APIView):

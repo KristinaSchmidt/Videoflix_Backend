@@ -1,3 +1,4 @@
+
 """Tests for the Videoflix video API and HLS streaming."""
 
 import tempfile
@@ -12,13 +13,15 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from users.models import User
 
 from .models import Video
+from .serializers import VideoSerializer
+from .tasks import process_video
 
 
 class VideoAPITests(APITestCase):
-    """Test authenticated video metadata access."""
+    """Test authenticated video metadata and thumbnail access."""
 
     def setUp(self):
-        """Create an authenticated user for video API tests."""
+        """Create an authenticated user and temporary media directory."""
         self.user = User.objects.create_user(
             email="video@example.com",
             password="TestPassword123!",
@@ -26,35 +29,49 @@ class VideoAPITests(APITestCase):
         )
 
         refresh = RefreshToken.for_user(self.user)
+        self.client.cookies["access_token"] = str(refresh.access_token)
 
-        self.client.cookies["access_token"] = str(
-            refresh.access_token
+        self.temp_directory = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(
+            MEDIA_ROOT=Path(self.temp_directory.name)
         )
+        self.settings_override.enable()
 
-    @patch("videos.signals.django_rq.get_queue")
-    def test_video_list_returns_frontend_fields(self, mocked_queue):
-        """Video endpoint should return fields expected by frontend."""
-        mocked_queue.return_value.enqueue.return_value = None
+    def tearDown(self):
+        """Clean up temporary uploaded files."""
+        self.settings_override.disable()
+        self.temp_directory.cleanup()
 
-        thumbnail = SimpleUploadedFile(
-            "thumbnail.jpg",
-            b"thumbnail-content",
-            content_type="image/jpeg",
-        )
-
+    def create_video(self, with_thumbnail=True):
+        """Create a video without starting a real background worker."""
         video_file = SimpleUploadedFile(
             "video.mp4",
             b"video-content",
             content_type="video/mp4",
         )
 
-        Video.objects.create(
-            title="Test Video",
-            description="Test description",
-            category="drama",
-            thumbnail=thumbnail,
-            video_file=video_file,
-        )
+        fields = {
+            "title": "Test Video",
+            "description": "Test description",
+            "category": "drama",
+            "video_file": video_file,
+        }
+
+        if with_thumbnail:
+            fields["thumbnail"] = SimpleUploadedFile(
+                "thumbnail.png",
+                b"thumbnail-content",
+                content_type="image/png",
+            )
+
+        with patch("videos.signals.django_rq.get_queue"):
+            video = Video.objects.create(**fields)
+
+        return video
+
+    def test_video_list_returns_frontend_fields(self):
+        """Video endpoint should return fields expected by frontend."""
+        self.create_video()
 
         response = self.client.get("/api/video/")
 
@@ -78,6 +95,88 @@ class VideoAPITests(APITestCase):
         response = self.client.get("/api/video/")
 
         self.assertEqual(response.status_code, 401)
+
+    def test_missing_thumbnail_uses_default_image(self):
+        """Videos without thumbnails should use the default image."""
+        video = self.create_video(with_thumbnail=False)
+
+        data = VideoSerializer(video).data
+
+        self.assertIn(
+            "default-thumbnail",
+            data["thumbnail_url"],
+        )
+
+    def test_uploaded_thumbnail_has_api_url(self):
+        """Uploaded thumbnails should use the protected API route."""
+        video = self.create_video()
+
+        data = VideoSerializer(video).data
+
+        self.assertEqual(
+            data["thumbnail_url"],
+            f"/api/video/{video.id}/thumbnail/",
+        )
+
+    def test_uploaded_thumbnail_can_be_downloaded(self):
+        """Authenticated users should receive uploaded thumbnails."""
+        video = self.create_video()
+
+        response = self.client.get(
+            f"/api/video/{video.id}/thumbnail/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            b"".join(response.streaming_content),
+            b"thumbnail-content",
+        )
+
+    def test_thumbnail_requires_authentication(self):
+        """Anonymous users should not download thumbnails."""
+        video = self.create_video()
+        self.client.cookies.clear()
+
+        response = self.client.get(
+            f"/api/video/{video.id}/thumbnail/"
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_missing_thumbnail_returns_not_found(self):
+        """Thumbnail endpoint should return 404 if no image exists."""
+        video = self.create_video(with_thumbnail=False)
+
+        response = self.client.get(
+            f"/api/video/{video.id}/thumbnail/"
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_video_processing_is_queued_after_commit(self):
+        """Background processing must wait for the database commit."""
+        with patch("videos.signals.django_rq.get_queue") as get_queue:
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                video = Video.objects.create(
+                    title="First Upload",
+                    description="Test initial upload",
+                    category="drama",
+                    video_file=SimpleUploadedFile(
+                        "first.mp4",
+                        b"video-content",
+                        content_type="video/mp4",
+                    ),
+                )
+
+                get_queue.assert_not_called()
+
+            self.assertEqual(len(callbacks), 1)
+            get_queue.assert_called_once_with("default")
+            get_queue.return_value.enqueue.assert_called_once()
+
+            args = get_queue.return_value.enqueue.call_args.args
+
+            self.assertEqual(args[1], video.id)
 
 
 class HLSStreamingTests(APITestCase):
@@ -175,3 +274,63 @@ class HLSStreamingTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+
+
+class VideoAdminUploadTests(APITestCase):
+    """Test the first video upload through Django Admin."""
+
+    def setUp(self):
+        """Prepare an admin user and temporary media storage."""
+        self.user = User.objects.create_superuser(
+            email="admin-upload@example.com",
+            password="TestPassword123!",
+        )
+        self.client.force_login(self.user)
+
+        self.temp_directory = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(
+            MEDIA_ROOT=Path(self.temp_directory.name)
+        )
+        self.settings_override.enable()
+
+    def tearDown(self):
+        """Remove temporary uploaded files."""
+        self.settings_override.disable()
+        self.temp_directory.cleanup()
+
+    def test_first_admin_upload_without_thumbnail(self):
+        """First admin upload succeeds and queues processing after commit."""
+        self.assertEqual(Video.objects.count(), 0)
+
+        with patch("videos.signals.django_rq.get_queue") as get_queue:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    "/admin/videos/video/add/",
+                    {
+                        "title": "First Admin Upload",
+                        "description": "Video without thumbnail",
+                        "category": "drama",
+                        "video_file": SimpleUploadedFile(
+                            "first-upload.mp4",
+                            b"test-video-content",
+                            content_type="video/mp4",
+                        ),
+                        "_save": "Save",
+                    },
+                )
+
+                get_queue.assert_not_called()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Video.objects.count(), 1)
+
+        video = Video.objects.get()
+        self.assertFalse(video.thumbnail)
+
+        get_queue.assert_called_once_with("default")
+        get_queue.return_value.enqueue.assert_called_once_with(
+            process_video,
+            video.id,
+        )

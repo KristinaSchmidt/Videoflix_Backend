@@ -1,5 +1,8 @@
+
 """Serializers for Videoflix video data."""
 
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.urls import reverse
 from rest_framework import serializers
 
 from .models import Video
@@ -11,8 +14,6 @@ class VideoSerializer(serializers.ModelSerializer):
     thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
-        """Configure the fields exposed by the video API."""
-
         model = Video
         fields = (
             "id",
@@ -25,13 +26,20 @@ class VideoSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_thumbnail_url(self, obj):
-        """Return an absolute URL for the video thumbnail."""
-        if not obj.thumbnail:
-            return None
+        """Return an uploaded thumbnail or the default image."""
+        if obj.thumbnail:
+            thumbnail_url = reverse(
+                "video-thumbnail",
+                kwargs={"video_id": obj.id},
+            )
+        else:
+            thumbnail_url = staticfiles_storage.url(
+                "videos/default-thumbnail.png"
+            )
 
         request = self.context.get("request")
 
         if request:
-            return request.build_absolute_uri(obj.thumbnail.url)
+            return request.build_absolute_uri(thumbnail_url)
 
-        return obj.thumbnail.url
+        return thumbnail_url
