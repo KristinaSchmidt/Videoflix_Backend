@@ -43,4 +43,6 @@ else:
     print(f"Superuser '{email}' already exists.")
 EOF
 
-exec gunicorn core.wsgi:application --bind 0.0.0.0:8000 --reload
+exec gunicorn core.wsgi:application \
+    --bind 0.0.0.0:8000 \
+    --timeout 180
