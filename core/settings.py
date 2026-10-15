@@ -272,12 +272,16 @@ CACHES = {
 }
 
 
+
 RQ_QUEUES = {
     "default": {
         "HOST": REDIS_HOST,
         "PORT": REDIS_PORT,
         "DB": REDIS_DB,
         "DEFAULT_TIMEOUT": 900,
-        "REDIS_CLIENT_KWARGS": {},
+        "REDIS_CLIENT_KWARGS": {
+            "socket_connect_timeout": 3,
+            "socket_timeout": 5,
+        },
     },
 }

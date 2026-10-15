@@ -5,6 +5,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+from redis.exceptions import ConnectionError as RedisConnectionError
+from rq import Retry
+
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
@@ -330,7 +333,62 @@ class VideoAdminUploadTests(APITestCase):
         self.assertFalse(video.thumbnail)
 
         get_queue.assert_called_once_with("default")
-        get_queue.return_value.enqueue.assert_called_once_with(
-            process_video,
-            video.id,
-        )
+        get_queue.return_value.enqueue.assert_called_once()
+        args = get_queue.return_value.enqueue.call_args.args
+        kwargs = get_queue.return_value.enqueue.call_args.kwargs
+        self.assertEqual(args, (process_video, video.id))
+        self.assertIsInstance(kwargs["retry"], Retry)
+        self.assertEqual(kwargs["retry"].max, 3)
+
+    def test_redis_failure_does_not_break_admin_upload(self):
+        """The upload succeeds even when Redis cannot accept the job."""
+        with patch("videos.signals.django_rq.get_queue") as get_queue:
+            get_queue.side_effect = RedisConnectionError("Redis unavailable")
+            with self.assertLogs("videos.signals", level="ERROR"):
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = self.client.post(
+                        "/admin/videos/video/add/",
+                        {
+                            "title": "Upload During Redis Outage",
+                            "description": "Redis unavailable at commit",
+                            "category": "drama",
+                            "video_file": SimpleUploadedFile(
+                                "redis-outage.mp4",
+                                b"test-video-content",
+                                content_type="video/mp4",
+                            ),
+                            "_save": "Save",
+                        },
+                    )
+        self.assertEqual(response.status_code, 302)
+        video = Video.objects.get(title="Upload During Redis Outage")
+        self.assertEqual(video.processing_status, "pending")
+
+
+class VideoProcessingStatusTests(APITestCase):
+    """Check that worker processing results are saved to the database."""
+
+    def setUp(self):
+        with patch("videos.signals.django_rq.get_queue"):
+            self.video = Video.objects.create(
+                title="Processing status test",
+                description="Test processing states",
+                category="drama",
+                video_file="videos/status-test.mp4",
+            )
+
+    @patch("videos.tasks.convert_video_to_hls")
+    def test_successful_processing_marks_video_completed(self, convert):
+        process_video(self.video.pk)
+        self.video.refresh_from_db()
+        self.assertEqual(self.video.processing_status, "completed")
+        convert.assert_called_once()
+
+    @patch("videos.tasks.convert_video_to_hls", side_effect=RuntimeError("FFmpeg failed"))
+    def test_failed_processing_marks_video_failed(self, convert):
+        with self.assertLogs("videos.tasks", level="ERROR"):
+            with self.assertRaises(RuntimeError):
+                process_video(self.video.pk)
+        self.video.refresh_from_db()
+        self.assertEqual(self.video.processing_status, "failed")
+        convert.assert_called_once()

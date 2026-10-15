@@ -1,3 +1,4 @@
+
 from django.contrib import admin
 
 from .models import Video
@@ -10,7 +11,13 @@ class VideoAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "category",
+        "processing_status",
         "created_at",
     )
-    list_filter = ("category",)
+    list_filter = (
+        "category",
+        "processing_status",
+    )
     search_fields = ("title",)
+
+    readonly_fields = ("processing_status",)

@@ -1,13 +1,21 @@
+
 from django.db import models
 
 
 class Video(models.Model):
-    """Store metadata and source files for a Videoflix video."""
+    """Store metadata and processing state for a Videoflix video."""
 
     CATEGORY_CHOICES = [
         ("documentary", "Documentary"),
         ("drama", "Drama"),
         ("romance", "Romance"),
+    ]
+
+    PROCESSING_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
     ]
 
     title = models.CharField(max_length=255)
@@ -22,6 +30,12 @@ class Video(models.Model):
     category = models.CharField(
         max_length=50,
         choices=CATEGORY_CHOICES,
+    )
+    processing_status = models.CharField(
+        max_length=20,
+        choices=PROCESSING_STATUS_CHOICES,
+        default="pending",
+        db_index=True,
     )
 
     class Meta:

@@ -9,12 +9,24 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:latest
     container_name: videoflix_redis
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   web:
     build:
@@ -31,8 +43,10 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   worker:
     build:
@@ -46,13 +60,16 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     entrypoint:
       - python
       - manage.py
       - rqworker
       - default
+      - --with-scheduler
     restart: unless-stopped
 
 volumes:
