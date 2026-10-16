@@ -48,30 +48,6 @@ services:
       redis:
         condition: service_healthy
 
-  worker:
-    build:
-      context: .
-      dockerfile: backend.Dockerfile
-    env_file: .env
-    container_name: videoflix_worker
-    volumes:
-      - .:/app
-      - videoflix_media:/app/media
-    environment:
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    entrypoint:
-      - python
-      - manage.py
-      - rqworker
-      - default
-      - --with-scheduler
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   redis_data:
